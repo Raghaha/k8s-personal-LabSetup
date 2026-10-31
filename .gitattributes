@@ -1,0 +1,6 @@
+# Force Unix line endings (LF) for everything that runs inside the Linux VMs.
+# Without this, Git on Windows may convert files to CRLF and Bash then fails
+# with errors like: $'\r': command not found
+*.sh        text eol=lf
+lab.env     text eol=lf
+Vagrantfile text eol=lf
