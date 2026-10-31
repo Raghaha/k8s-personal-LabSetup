@@ -39,6 +39,7 @@ Build a 3-node Kubernetes cluster on a Windows laptop with **one command** (`vag
 | `scripts/08-teardown-goat.sh` | Master: remove Goat | — |
 | `scripts/09-verify-cluster.sh` | Master: PASS/FAIL health check | — |
 | `scripts/host/00-check-prereqs.ps1` | Windows: checks your laptop before the first build | — |
+| `scripts/host/01-set-storage.ps1` | Windows: moves VM disks / image cache to another drive (`VM_STORAGE_DIR`) | Run once, optional |
 | `docs/PREREQUISITES.md` | One-time laptop setup | — |
 | `.cluster/` | **Generated** (admin kubeconfig, join token). Contains credentials, git-ignored | Never commit |
 | `.gitattributes`, `.gitignore` | Keep LF line endings; keep secrets out of Git | No |
@@ -52,7 +53,11 @@ Design rule: **one script = one job.** To add something new (e.g. another vulner
    ```powershell
    powershell -ExecutionPolicy Bypass -File .\scripts\host\00-check-prereqs.ps1
    ```
-3. (Optional) Review `lab.env`. The defaults suit a 16 GB laptop.
+3. (Optional) Review `lab.env`. The defaults suit a 16 GB laptop. To keep VM disks off `C:`, set `VM_STORAGE_DIR="D:\VMs"` there and run, once:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\scripts\host\01-set-storage.ps1
+   ```
+   then fully restart VS Code.
 4. Build everything (≈ 15–30 min the first time; downloads dominate):
    ```powershell
    vagrant up
@@ -76,6 +81,7 @@ Design rule: **one script = one job.** To add something new (e.g. another vulner
 | Give workers more/less RAM or CPU | `WORKER_MEMORY_MB`, `WORKER_CPUS` in `lab.env` | `vagrant halt` → `vagrant up` (applies to existing VMs) |
 | Add a 3rd worker | `WORKER_COUNT=3` | `vagrant up k8s-worker3` (the master's join token must still be valid; otherwise first run `vagrant ssh k8s-master -c "sudo bash /vagrant/scripts/05-print-join-command.sh"`) |
 | Change IP range | `NETWORK_PREFIX` etc. | Full rebuild (see below) |
+| Store VMs on another drive | `VM_STORAGE_DIR` | `01-set-storage.ps1`, restart VS Code (`vagrant destroy -f` first if VMs exist) |
 | Use another Kubernetes minor | `K8S_MINOR` | Full rebuild (the scripts install fresh; they do not upgrade in place) |
 | Use another Calico/Helm/Goat version | `CALICO_VERSION` / `HELM_VERSION` / `GOAT_REF` | Re-run the relevant step, or rebuild |
 | Change what a step does | The matching script in `scripts/` | `vagrant provision <vm> --provision-with <step>` |

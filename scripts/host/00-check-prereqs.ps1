@@ -66,13 +66,35 @@ Write-Host "  This laptop : $totalMB MB RAM total, $freeMB MB free now, $($cpu.N
 if ($freeMB -lt $needMB + 2048) { Warn "Free RAM is tight. Close heavy apps, or lower *_MEMORY_MB in lab.env." } else { Ok "Enough free RAM" }
 if ($needCpu -gt $cpu.NumberOfLogicalProcessors) { Warn "More vCPUs requested than logical CPUs (works, but oversubscribed)" } else { Ok "vCPU count fits" }
 
-$drive = (Get-Item $root).PSDrive
+# Disk space is checked on the drive where the VMs will live: VM_STORAGE_DIR if
+# set in lab.env, otherwise the drive of this project folder.
+$driveName = (Get-Item $root).PSDrive.Name
+if ($cfg['VM_STORAGE_DIR'] -match '^([A-Za-z]):') { $driveName = $Matches[1].ToUpper() }
+$drive = Get-PSDrive -Name $driveName
 $freeGB = [math]::Round($drive.Free / 1GB)
 $needGB = 20 * ($workers + 1)    # each VM disk grows up to ~20 GB in practice
 if ($freeGB -lt $needGB) { Warn "Only $freeGB GB free on $($drive.Name): (plan for ~$needGB GB + the box download)" }
 else { Ok "$freeGB GB free on $($drive.Name):" }
 if ($env:VAGRANT_HOME) { Write-Host "  Vagrant boxes are stored in: $env:VAGRANT_HOME" }
 else { Write-Host "  Vagrant boxes are stored in: $env:USERPROFILE\.vagrant.d  (set VAGRANT_HOME to move it)" }
+
+Write-Host "`n== Storage locations ==" -ForegroundColor Cyan
+$want = $cfg['VM_STORAGE_DIR']
+$vmFolder = $null
+if ($vbox) {
+    $line = & $vbox list systemproperties | Select-String 'Default machine folder'
+    if ($line) { $vmFolder = ($line.ToString() -replace '^.*?:\s*', '').Trim() }
+}
+$vhome = if ($env:VAGRANT_HOME) { $env:VAGRANT_HOME } else { "$env:USERPROFILE\.vagrant.d" }
+Write-Host "  VirtualBox VM folder : $vmFolder"
+Write-Host "  Vagrant box storage  : $vhome"
+if ($want) {
+    $wantVm = Join-Path $want 'VirtualBox'
+    $wantVh = Join-Path $want 'vagrant.d'
+    if ($vmFolder -and ($vmFolder.TrimEnd('\') -ine $wantVm.TrimEnd('\'))) { Warn "VM folder differs from VM_STORAGE_DIR - run scripts\host\01-set-storage.ps1" } else { Ok "VM folder matches lab.env" }
+    if ($vhome.TrimEnd('\') -ine $wantVh.TrimEnd('\')) { Warn "VAGRANT_HOME differs from VM_STORAGE_DIR - run 01-set-storage.ps1, then restart VS Code" } else { Ok "VAGRANT_HOME matches lab.env" }
+} else { Write-Host "  (VM_STORAGE_DIR is empty in lab.env: defaults in use)" }
+if ($vmFolder -match 'OneDrive|Dropbox|Google ?Drive') { Warn "VM folder looks cloud-synced - move it (see docs/PREREQUISITES.md)" }
 
 Write-Host "`n== Project files ==" -ForegroundColor Cyan
 $crlf = Get-ChildItem (Join-Path $root 'scripts') -Filter *.sh | Where-Object {
